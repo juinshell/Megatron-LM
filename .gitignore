@@ -7,3 +7,11 @@ build
 slurm*
 logs
 .vscode
+local/
+.gitmodules
+
+*.xz
+meg-gpt2*
+gpt2-merges.txt
+gpt2-vocab.json
+oscar-*

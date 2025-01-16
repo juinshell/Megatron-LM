@@ -6,7 +6,7 @@
 import math
 import os
 import warnings
-from typing import Callable, Optional
+from typing import Callable, Optional, Set
 
 import torch
 import torch.nn.functional as F
@@ -45,6 +45,18 @@ _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS = {
     'partition_stride': 1,
 }
 
+g_info = {"total_input": set(), "weight": set(), "matmul_shape": set()}
+
+def exit_handler():
+    for k, v in g_info.items():
+        if len(v) == 0:
+            continue
+        print(f"{k}: {len(v)}")
+        for i, size in enumerate(v):
+            print(f"    {i}: {size}")
+
+import atexit
+atexit.register(exit_handler)
 
 def param_is_not_tensor_parallel_duplicate(param):
     return (hasattr(param, 'tensor_model_parallel') and param.tensor_model_parallel) or (
@@ -241,6 +253,10 @@ class LinearWithFrozenWeight(torch.autograd.Function):
         output = torch.matmul(input, weight.t())
         if bias is not None:
             output = output + bias
+        if torch.distributed.get_rank(group=get_tensor_model_parallel_group()) == 0:
+            g_info["total_input"].add(input.size())
+            g_info["weight"].add(weight.size())
+            g_info["matmul_shape"].add((input.size(), weight.size()))
         return output
 
     @staticmethod
@@ -332,7 +348,11 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
             total_input = all_gather_buffer
         else:
             total_input = input
-
+        if torch.distributed.get_rank(group=get_tensor_model_parallel_group()) == 0:
+            g_info["total_input"].add(total_input.size())
+            g_info["weight"].add(weight.size())
+            g_info["matmul_shape"].add((total_input.size(), weight.size()))
+            # print("total_input size: ", total_input.size(), "weight size: ", weight.size())
         output = torch.matmul(total_input, weight.t())
         if bias is not None:
             output = output + bias

@@ -4,7 +4,7 @@
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 
-GPUS_PER_NODE=8
+GPUS_PER_NODE=4
 # Change for multinode config
 MASTER_ADDR=localhost
 MASTER_PORT=6000
@@ -12,11 +12,11 @@ NUM_NODES=1
 NODE_RANK=0
 WORLD_SIZE=$(($GPUS_PER_NODE*$NUM_NODES))
 
-CHECKPOINT_PATH=$0 #<Specify path>
-TENSORBOARD_LOGS_PATH=$1 #<Specify path>
-VOCAB_FILE=$2 #<Specify path to file>/gpt2-vocab.json
-MERGE_FILE=$3 #<Specify path to file>/gpt2-merges.txt
-DATA_PATH=$4 #<Specify path and file prefix>_text_document
+CHECKPOINT_PATH=$1 #<Specify path>
+TENSORBOARD_LOGS_PATH=$2 #<Specify path>
+VOCAB_FILE=$3 #<Specify path to file>/gpt2-vocab.json
+MERGE_FILE=$4 #<Specify path to file>/gpt2-merges.txt
+DATA_PATH=$5 #<Specify path and file prefix>_text_document
 
 DISTRIBUTED_ARGS=(
     --nproc_per_node $GPUS_PER_NODE 
@@ -29,15 +29,15 @@ GPT_MODEL_ARGS=(
     --num-layers 96 
     --hidden-size 12288 
     --num-attention-heads 96 
-    --seq-length 2048 
+    --seq-length 1024 
     --max-position-embeddings 2048 
 )
 
 TRAINING_ARGS=(
     --micro-batch-size 1 
-    --global-batch-size 1536 
-    --rampup-batch-size 16 16 5859375 
-    --train-iters 500000 
+    --global-batch-size 1
+    # --rampup-batch-size 16 16 5859375 
+    --train-iters 1000 
     --weight-decay 0.1 
     --adam-beta1 0.9 
     --adam-beta2 0.95 
@@ -53,8 +53,8 @@ TRAINING_ARGS=(
 )
 
 MODEL_PARALLEL_ARGS=(
-	--tensor-model-parallel-size 8 
-	--pipeline-model-parallel-size 16 
+	--tensor-model-parallel-size 4
+	--pipeline-model-parallel-size 1 
 )
 
 DATA_ARGS=(
