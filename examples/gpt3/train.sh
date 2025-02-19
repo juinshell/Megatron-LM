@@ -24,11 +24,11 @@ python -m torch.distributed.launch $DISTRIBUTED_ARGS \
        pretrain_gpt.py \
        --tensor-model-parallel-size 4 \
        --pipeline-model-parallel-size 1 \
-       --num-layers 24 \
-       --hidden-size 1024 \
-       --num-attention-heads 16 \
-       --micro-batch-size 4 \
-       --global-batch-size 8 \
+       --num-layers 12 \
+       --hidden-size 512 \
+       --num-attention-heads 8 \
+       --micro-batch-size 1 \
+       --global-batch-size 1 \
        --seq-length 1024 \
        --max-position-embeddings 1024 \
        --train-iters 5000 \
