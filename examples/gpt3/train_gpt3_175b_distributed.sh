@@ -26,16 +26,22 @@ DISTRIBUTED_ARGS=(
 )
 
 GPT_MODEL_ARGS=(
-    --num-layers 96 
-    --hidden-size 12288 
-    --num-attention-heads 96 
-    --seq-length 1024 
+    # 175B
+    # --num-layers 96 
+    # --hidden-size 12288 
+    # --num-attention-heads 96 
+    # --seq-length 1024 
     --max-position-embeddings 2048 
+    # 345M
+    --num-layers 12
+    --hidden-size 512
+    --num-attention-heads 8
+    --seq-length 1024
 )
 
 TRAINING_ARGS=(
     --micro-batch-size 1 
-    --global-batch-size 1
+    --global-batch-size 32
     # --rampup-batch-size 16 16 5859375 
     --train-iters 1000 
     --weight-decay 0.1 
