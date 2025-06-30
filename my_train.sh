@@ -10,12 +10,14 @@ bash ./examples/gpt3/train_gpt3_175b_distributed.sh \
     meg-gpt2_text_document
 
 # in container
+conda activate finetune
+pip install -r requirements.txt
 bash ./examples/gpt3/train_gpt3_175b_distributed.sh \
     /tmp/ckpt \
     /tmp/meg-gpt2/tensorboard \
-    /state/partition/jxdeng/gpt2/gpt2-vocab.json \
-    /state/partition/jxdeng/gpt2/gpt2-merges.txt \
-    /state/partition/jxdeng/gpt2/meg-gpt2_text_document
+    /tmp/models/gpt2/gpt2-vocab.json \
+    /tmp/models/gpt2/gpt2-merges.txt \
+    /tmp/models/gpt2/meg-gpt2_text_document
 
 rm -rf /tmp/ckpt/*
 rm -rf /tmp/meg-gpt2/tensorboard/*
