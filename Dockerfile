@@ -110,14 +110,17 @@ RUN . /opt/conda/etc/profile.d/conda.sh && \
 # COPY . .
 RUN apt-get update && apt-get install -y sudo
 
-ARG UID
-ARG GID
-RUN groupadd -g $GID jxdeng && \
-    useradd -u $UID -g $GID -m -s /bin/bash -G sudo jxdeng
+RUN mkdir -p /tmp/models/gpt2
+# ARG UID
+# ARG GID
+# RUN groupadd -g $GID jxdeng && \
+#     useradd -u $UID -g $GID -m -s /bin/bash -G sudo jxdeng
 
-RUN echo "jxdeng ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+# RUN echo "jxdeng ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 # Enterpoint for bash shell
 ENTRYPOINT ["/bin/bash"]
-USER jxdeng
-# docker build -t megatron-lm:latest --build-arg UID=$(id -u) --build-arg GID=$(id -g) .
-# docker run --name megatron-lm -tid --gpus=all --ipc=host --workdir /workspace/megatron-lm -v /state/partition/jxdeng/gpt2:/state/partition/jxdeng/gpt2  -v ~/workspace/shmem-triton/3rdparty/megatron-lm:/workspace/megatron-lm megatron-lm:latest
+# USER jxdeng
+
+# docker build -t megatron-lm:0.4.0 .
+# docker run --name megatron-lm -tid --gpus=all --ipc=host megatron-lm:0.4.0
+# docker cp /state/partition/jxdeng/gpt2/ megatron-lm:/tmp/models/gpt2/
