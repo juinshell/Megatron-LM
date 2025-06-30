@@ -81,6 +81,7 @@ RUN . /opt/conda/etc/profile.d/conda.sh && \
     # Option 2: Works in docker image build.
     git clone --recursive https://github.com/juinshell/Megatron-LM.git && \
     cd Megatron-LM && \ 
+    git checkout core_r0.4.0 && \
     MAX_JOBS=16 pip install -e .
 
 # Install nvidia apex
