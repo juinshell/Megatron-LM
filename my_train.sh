@@ -19,6 +19,14 @@ bash ./examples/gpt3/train_gpt3_175b_distributed.sh \
     /tmp/models/gpt2/gpt2-merges.txt \
     /tmp/models/gpt2/meg-gpt2_text_document
 
+# aliyun
+bash ./examples/gpt3/train_gpt3_175b_distributed.sh \
+    /tmp/ckpt \
+    /tmp/meg-gpt2/tensorboard \
+    ./vocab.json \
+    ./merges.txt \
+    ./meg-gpt2_text_document
+
 rm -rf /tmp/ckpt/*
 rm -rf /tmp/meg-gpt2/tensorboard/*
 

@@ -1,0 +1,82 @@
+# @ Info: Image of megatron-sharded model experiments.
+# Author: Chunyu Xue
+
+# Driver Version: 515.48.07
+# FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
+# # Driver Version: > 525
+# FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+# FROM nvidia/cuda:12.5.1-cudnn-devel-ubuntu22.04
+# FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
+# FROM nvidia/cuda:12.3.2-cudnn9-devel-ubuntu22.04
+
+FROM nvcr.io/nvidia/pytorch:24.10-py3
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Install common tool & conda
+RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt install -y python3.10 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt update && \
+    apt install wget -y && \
+    apt install git -y && \
+    apt install curl -y && \
+    apt install vim -y && \
+    apt install bc && \
+    apt-get install net-tools -y && \
+    apt install ssh -y
+
+# Workspace
+WORKDIR /app
+
+# Install conda finetune env
+COPY requirements.txt requirements.txt
+RUN python -m pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
+
+# Cuda path
+ENV CUDA_PATH=/usr/local/cuda
+# ENV LD_LIBRARY_PATH=$CUDA_PATH/lib64:$CUDA_PATH/compat:/usr/lib/x86_64-linux-gnu:$CUDA_PATH/targets/x86_64-linux/lib/stubs/:$LD_LIBRARY_PATH
+# If the host driver is new enough, don't add `$CUDA_PATH/compat` otherwise will occur: 
+#   `CUDA Error: system has unsupported display driver / cuda driver combination`.
+ENV LD_LIBRARY_PATH=$CUDA_PATH/lib64:/usr/lib/x86_64-linux-gnu:$CUDA_PATH/targets/x86_64-linux/lib/stubs/:$LD_LIBRARY_PATH
+ENV CUDNN_PATH=/usr/include
+# Transformer engine path
+ENV NVTE_FRAMEWORK=pytorch
+
+
+# Install megatron-lm 
+RUN pip install --upgrade setuptools && \
+    MAX_JOBS=16 pip install git+https://github.com/NVIDIA/TransformerEngine.git@stable && \
+    # git clone --branch stable --recursive https://github.com/NVIDIA/TransformerEngine.git && \
+    # cd TransformerEngine && \
+    # export NVTE_FRAMEWORK=pytorch && \
+    # pip install . && \
+    # Option 1: Useful in direct installation on the host.
+    # pip install --no-build-isolation git+https://github.com/DicardoX/Megatron-LM.git && \
+    # Option 2: Works in docker image build.
+    git clone --recursive https://github.com/juinshell/Megatron-LM.git && \
+    cd Megatron-LM && \ 
+    git checkout core_r0.4.0 && \
+    MAX_JOBS=16 pip install -e .
+
+
+# Copy workspace
+# COPY . .
+RUN apt-get update && apt-get install -y sudo
+
+RUN mkdir -p /tmp/models/gpt2
+# ARG UID
+# ARG GID
+# RUN groupadd -g $GID jxdeng && \
+#     useradd -u $UID -g $GID -m -s /bin/bash -G sudo jxdeng
+
+# RUN echo "jxdeng ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+# Enterpoint for bash shell
+ENTRYPOINT ["/bin/bash"]
+# USER jxdeng
+
+# docker build -t megatron-lm:0.4.0 -f Dockerfile.aliyun .
+# docker run --name megatron-lm -tid --gpus=all --ipc=host -v /home/djx02136392/Megatron-LM:/workspace/Megatron-LM nvcr.io/nvidia/pytorch:24.10-py3

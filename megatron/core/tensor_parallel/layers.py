@@ -45,15 +45,74 @@ _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS = {
     'partition_stride': 1,
 }
 
-g_info = {"total_input": set(), "weight": set(), "matmul_shape": set()}
+class GInfo:
+    """Global information collector for debugging purposes."""
+    def __init__(self):
+        self.total_input: Set[torch.Size] = set()
+        self.weight: Set[torch.Size] = set()
+        self.matmul_shape: dict = {}
+        self.timings = {}
+        # CUDA events for timing.
+        self.start_event = torch.cuda.Event(enable_timing=True)
+        self.end_event = torch.cuda.Event(enable_timing=True)
+    
+    def start_timing(self):
+        """Start timing."""
+        self.start_event.record()
+
+    def end_timing(self, key: str):
+        """End timing and return the elapsed time."""
+        self.end_event.record()
+        torch.cuda.synchronize()
+        timing = self.start_event.elapsed_time(self.end_event)
+        if key not in self.timings:
+            self.timings[key] = 0
+        self.timings[key] += timing
+        
+        
+
+    @staticmethod
+    def get_matmul_key(t1 : torch.Tensor, t2: torch.Tensor) -> str:
+        """Get a key for the matmul shape."""
+        return f"{t1.size()} x {t2.size()}"
+    
+    def add(self, t1: torch.Tensor, t2: torch.Tensor):
+        """Add a matmul call info to the global info."""
+        key = self.get_matmul_key(t1, t2)
+        if key not in self.matmul_shape:
+            self.matmul_shape[key] = 0
+        self.matmul_shape[key] += 1
+        self.total_input.add(t1.size())
+        self.weight.add(t2.size())
+            
+    
+    @staticmethod
+    def print_items(object):
+        if isinstance(object, Set):
+            for i, item in enumerate(object):
+                print(f"    {i}: {item}")
+        elif isinstance(object, dict):
+            for i, (key, value) in enumerate(object.items()):
+                print(f"    {i}: {key} -> {value}")
+    
+    def show(self):
+        """Print the global info."""
+        print("Global Info:")
+        print(f"Total input num: {len(self.total_input)}")
+        GInfo.print_items(self.total_input)
+        print(f"Weight num: {len(self.weight)}")
+        GInfo.print_items(self.weight)
+        print("Matmul shape:")
+        GInfo.print_items(self.matmul_shape)
+        print("Timings(sum):")
+        GInfo.print_items(self.timings)
+            
+        
+g_info = GInfo()
 
 def exit_handler():
-    for k, v in g_info.items():
-        if len(v) == 0:
-            continue
-        print(f"{k}: {len(v)}")
-        for i, size in enumerate(v):
-            print(f"    {i}: {size}")
+    if torch.distributed.get_rank(group=get_tensor_model_parallel_group()) == 0:
+        g_info.show()
 
 import atexit
 atexit.register(exit_handler)
@@ -253,10 +312,9 @@ class LinearWithFrozenWeight(torch.autograd.Function):
         output = torch.matmul(input, weight.t())
         if bias is not None:
             output = output + bias
+        # [shmtt]
         if torch.distributed.get_rank(group=get_tensor_model_parallel_group()) == 0:
-            g_info["total_input"].add(input.size())
-            g_info["weight"].add(weight.size())
-            g_info["matmul_shape"].add((input.size(), weight.size()))
+           g_info.add(input, weight)
         return output
 
     @staticmethod
@@ -342,18 +400,21 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
             dim_size[0] = dim_size[0] * world_size
 
             all_gather_buffer = get_global_memory_buffer().get_tensor(dim_size, input.dtype, "mpu")
+            if torch.distributed.get_rank(group=get_tensor_model_parallel_group()) == 0:
+                g_info.start_timing()
             torch.distributed._all_gather_base(
                 all_gather_buffer, input, group=get_tensor_model_parallel_group()
             )
             total_input = all_gather_buffer
         else:
             total_input = input
-        if torch.distributed.get_rank(group=get_tensor_model_parallel_group()) == 0:
-            g_info["total_input"].add(total_input.size())
-            g_info["weight"].add(weight.size())
-            g_info["matmul_shape"].add((total_input.size(), weight.size()))
-            # print("total_input size: ", total_input.size(), "weight size: ", weight.size())
         output = torch.matmul(total_input, weight.t())
+        
+        if torch.distributed.get_rank(group=get_tensor_model_parallel_group()) == 0:
+            g_info.end_timing(
+                GInfo.get_matmul_key(total_input, weight)
+            )
+            g_info.add(total_input, weight)
         if bias is not None:
             output = output + bias
         return output

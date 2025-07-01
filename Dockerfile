@@ -47,8 +47,9 @@ RUN . /opt/conda/etc/profile.d/conda.sh && \
     # && python3.10 -m pip install numpy --pre torch torchvision --force-reinstall --index-url https://download.pytorch.org/whl/nightly/cu124
     # && python3.10 -m pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu121
     # && pip3 install torch torchvision torchaudio
-    && python3.10 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 \ 
-    && python3.10 -m pip install -r requirements.txt
+    # && python3.10 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 \ 
+    && python3.10 -m pip install torch torchvision torchaudio -i https://mirrors.aliyun.com/pypi/simple \
+    && python3.10 -m pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
 
 # Cuda path
 ENV CUDA_PATH=/usr/local/cuda

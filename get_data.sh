@@ -6,20 +6,33 @@
 # pip install -r requirements.txt
 # pip install -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
 
-wget https://huggingface.co/bigscience/misc-test-data/resolve/main/stas/oscar-1GB.jsonl.xz
-wget https://s3.amazonaws.com/models.huggingface.co/bert/gpt2-vocab.json
-wget https://s3.amazonaws.com/models.huggingface.co/bert/gpt2-merges.txt
+# wget https://huggingface.co/bigscience/misc-test-data/resolve/main/stas/oscar-1GB.jsonl.xz
+# wget https://s3.amazonaws.com/models.huggingface.co/bert/gpt2-vocab.json
+# wget https://s3.amazonaws.com/models.huggingface.co/bert/gpt2-merges.txt
+
+wget https://hf-mirror.com/bigscience/misc-test-data/resolve/main/stas/oscar-1GB.jsonl.xz
+wget https://hf-mirror.com/openai-community/gpt2/resolve/main/merges.txt
+wget https://hf-mirror.com/openai-community/gpt2/resolve/main/vocab.json
 
 xz -d oscar-1GB.jsonl.xz
 
 python ./tools/preprocess_data.py \
   --input ./oscar-1GB.jsonl \
   --output-prefix meg-gpt2 \
-  --vocab-file ./gpt2-vocab.json \
+  --vocab-file ./vocab.json \
   --tokenizer-type GPT2BPETokenizer \
-  --merge-file ./gpt2-merges.txt \
+  --merge-file ./merges.txt \
   --append-eod \
   --workers 8
+
+# python ./tools/preprocess_data.py \
+#   --input ./oscar-1GB.jsonl \
+#   --output-prefix meg-gpt2 \
+#   --vocab-file ./gpt2-vocab.json \
+#   --tokenizer-type GPT2BPETokenizer \
+#   --merge-file ./gpt2-merges.txt \
+#   --append-eod \
+#   --workers 8
 
 # mkdir -p /tmp/meg-gpt2/ckpt
 # mkdir -p /tmp/meg-gpt2/tensorboard
