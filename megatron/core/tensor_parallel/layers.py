@@ -8,6 +8,8 @@ import os
 import warnings
 from typing import Callable, Optional, Set
 
+from megatron import get_timers
+
 import torch
 import torch.nn.functional as F
 import torch.nn.init as init
@@ -98,12 +100,12 @@ class GInfo:
     def show(self):
         """Print the global info."""
         print("Global Info:")
-        print(f"Total input num: {len(self.total_input)}")
-        GInfo.print_items(self.total_input)
-        print(f"Weight num: {len(self.weight)}")
-        GInfo.print_items(self.weight)
-        print("Matmul shape:")
-        GInfo.print_items(self.matmul_shape)
+        # print(f"Total input num: {len(self.total_input)}")
+        # GInfo.print_items(self.total_input)
+        # print(f"Weight num: {len(self.weight)}")
+        # GInfo.print_items(self.weight)
+        # print("Matmul shape:")
+        # GInfo.print_items(self.matmul_shape)
         print("Timings(sum):")
         GInfo.print_items(self.timings)
             
@@ -394,14 +396,15 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
         ctx.async_grad_allreduce = async_grad_allreduce
         ctx.sequence_parallel = sequence_parallel
 
+        timers = get_timers()
+        
         if sequence_parallel:
             world_size = get_tensor_model_parallel_world_size()
             dim_size = list(input.size())
             dim_size[0] = dim_size[0] * world_size
 
             all_gather_buffer = get_global_memory_buffer().get_tensor(dim_size, input.dtype, "mpu")
-            if torch.distributed.get_rank(group=get_tensor_model_parallel_group()) == 0:
-                g_info.start_timing()
+            timers('ag-gemm', log_level=0).start()
             torch.distributed._all_gather_base(
                 all_gather_buffer, input, group=get_tensor_model_parallel_group()
             )
@@ -409,11 +412,9 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
         else:
             total_input = input
         output = torch.matmul(total_input, weight.t())
+        timers('ag-gemm').stop()
         
         if torch.distributed.get_rank(group=get_tensor_model_parallel_group()) == 0:
-            g_info.end_timing(
-                GInfo.get_matmul_key(total_input, weight)
-            )
             g_info.add(total_input, weight)
         if bias is not None:
             output = output + bias
@@ -424,7 +425,7 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
     def backward(ctx, grad_output):
         input, weight = ctx.saved_tensors
         use_bias = ctx.use_bias
-        
+
         if ctx.sequence_parallel:
             world_size = get_tensor_model_parallel_world_size()
             dim_size = list(input.size())
@@ -1012,6 +1013,9 @@ class RowParallelLinear(torch.nn.Module):
             self._forward_impl = linear_with_frozen_weight
         else:
             self._forward_impl = linear_with_grad_accumulation_and_async_allreduce
+        
+        timers = get_timers()
+        timers('gemm-rs', log_level=0).start()
         output_parallel = self._forward_impl(
             input=input_parallel,
             weight=self.weight,
@@ -1027,6 +1031,7 @@ class RowParallelLinear(torch.nn.Module):
             output_ = output_parallel
         elif self.sequence_parallel:
             output_ = reduce_scatter_to_sequence_parallel_region(output_parallel)
+            timers('gemm-rs').stop()
         else:
             output_ = reduce_from_tensor_model_parallel_region(output_parallel)
         if not self.skip_bias_add:

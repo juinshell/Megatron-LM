@@ -185,7 +185,7 @@ def forward_step(data_iterator, model: GPTModel):
                           labels=labels)
     timers('model-forward').stop()
     
-    timers.log(['model-forward',], barrier=True)
+    timers.log(['model-forward', 'ag-gemm', 'gemm-rs'], barrier=True, reset=True)
 
     return output_tensor, partial(loss_func, loss_mask)
 
