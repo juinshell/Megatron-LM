@@ -180,8 +180,12 @@ def forward_step(data_iterator, model: GPTModel):
         data_iterator)
     timers('batch-generator').stop()
 
+    timers('model-forward', log_level=0).start()
     output_tensor = model(tokens, position_ids, attention_mask,
                           labels=labels)
+    timers('model-forward').stop()
+    
+    timers.log(['model-forward',], barrier=True)
 
     return output_tensor, partial(loss_func, loss_mask)
 

@@ -313,8 +313,8 @@ class LinearWithFrozenWeight(torch.autograd.Function):
         if bias is not None:
             output = output + bias
         # [shmtt]
-        if torch.distributed.get_rank(group=get_tensor_model_parallel_group()) == 0:
-           g_info.add(input, weight)
+        # if torch.distributed.get_rank(group=get_tensor_model_parallel_group()) == 0:
+        #    g_info.add(input, weight)
         return output
 
     @staticmethod
@@ -424,7 +424,7 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
     def backward(ctx, grad_output):
         input, weight = ctx.saved_tensors
         use_bias = ctx.use_bias
-
+        
         if ctx.sequence_parallel:
             world_size = get_tensor_model_parallel_world_size()
             dim_size = list(input.size())
@@ -1018,7 +1018,7 @@ class RowParallelLinear(torch.nn.Module):
             bias=None,
             gradient_accumulation_fusion=self.gradient_accumulation_fusion,
             async_grad_allreduce=False,
-            sequence_parallel=False,
+            sequence_parallel=False, # MLP linear2 , do not all_gather
         )
 
         # All-reduce across all the partitions.
