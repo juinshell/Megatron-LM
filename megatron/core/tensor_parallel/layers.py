@@ -396,7 +396,7 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
         ctx.async_grad_allreduce = async_grad_allreduce
         ctx.sequence_parallel = sequence_parallel
 
-        timers = get_timers()
+        # timers = get_timers()
         
         if sequence_parallel:
             world_size = get_tensor_model_parallel_world_size()
@@ -404,7 +404,7 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
             dim_size[0] = dim_size[0] * world_size
 
             all_gather_buffer = get_global_memory_buffer().get_tensor(dim_size, input.dtype, "mpu")
-            timers('ag-gemm', log_level=0).start()
+            # timers('ag-gemm', log_level=0).start()
             torch.distributed._all_gather_base(
                 all_gather_buffer, input, group=get_tensor_model_parallel_group()
             )
@@ -412,7 +412,7 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
         else:
             total_input = input
         output = torch.matmul(total_input, weight.t())
-        timers('ag-gemm').stop()
+        # timers('ag-gemm').stop()
         
         if torch.distributed.get_rank(group=get_tensor_model_parallel_group()) == 0:
             g_info.add(total_input, weight)
@@ -834,6 +834,9 @@ class ColumnParallelLinear(torch.nn.Module):
             self._forward_impl = linear_with_frozen_weight
         else:
             self._forward_impl = linear_with_grad_accumulation_and_async_allreduce
+        timers = get_timers()
+        if self.sequence_parallel and not self.explicit_expert_comm:
+            timers('ag-gemm', log_level=0).start()
         output_parallel = self._forward_impl(
             input=input_parallel,
             weight=weight,
@@ -844,6 +847,8 @@ class ColumnParallelLinear(torch.nn.Module):
             else self.async_tensor_model_parallel_allreduce,
             sequence_parallel=False if self.explicit_expert_comm else self.sequence_parallel,
         )
+        if self.sequence_parallel and not self.explicit_expert_comm:
+            timers('ag-gemm').stop()
         if self.gather_output:
             # All-gather across the partitions.
             assert not self.sequence_parallel
@@ -1015,7 +1020,8 @@ class RowParallelLinear(torch.nn.Module):
             self._forward_impl = linear_with_grad_accumulation_and_async_allreduce
         
         timers = get_timers()
-        timers('gemm-rs', log_level=0).start()
+        if self.sequence_parallel:
+            timers('gemm-rs', log_level=0).start()
         output_parallel = self._forward_impl(
             input=input_parallel,
             weight=self.weight,
